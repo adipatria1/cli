@@ -87,7 +87,7 @@ def apply_crossfade_transition(clip1, clip2, duration=0.5):
     clip2 = clip2.crossfadein(duration)
     return CompositeVideoClip([clip1, clip2.set_start(clip1.duration - duration)])
 
-def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="720p"):
+def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="720p", num_threads=1):
     try:
         print("Memproses video...")
         video = VideoFileClip(movie_path)
@@ -182,7 +182,7 @@ def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="720p
             output_path,
             codec="libx264",
             audio_codec="aac",
-            threads=1,
+            threads=num_threads,
             fps=24
         )
         
@@ -349,9 +349,30 @@ def main():
             break
         print("Pilihan tidak valid!")
 
+    # Pilih jumlah threads
+    print("\nPilih jumlah threads untuk rendering:")
+    print("1. 1 thread (lambat tapi stabil)")
+    print("2. 2 threads")
+    print("3. 4 threads")
+    print("4. 8 threads (cepat tapi membutuhkan lebih banyak RAM)")
+    
+    thread_options = {
+        '1': 1,
+        '2': 2,
+        '3': 4,
+        '4': 8
+    }
+    
+    while True:
+        thread_choice = input("Masukkan pilihan (1/2/3/4): ")
+        if thread_choice in thread_options:
+            num_threads = thread_options[thread_choice]
+            break
+        print("Pilihan tidak valid!")
+
     # Mulai proses
     print("\nMemulai proses pembuatan recap...")
-    generate_recap(movie_path, timestamp_path, audio_path, resolution)
+    generate_recap(movie_path, timestamp_path, audio_path, resolution, num_threads)
 
 if __name__ == "__main__":
     main()
