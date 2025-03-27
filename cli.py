@@ -252,7 +252,7 @@ def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="480p
         transition_indices = random.sample(
             range(len(clips_with_transitions) - 1),
             transition_count
-        )
+        ) if len(clips_with_transitions) > 1 else []
 
         final_clips = []
         for i in range(len(clips_with_transitions)):
@@ -273,37 +273,49 @@ def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="480p
                 force_garbage_collection()
 
         logging.info("Menggabungkan klip final...")
-        final_clip = concatenate_videoclips(final_clips, method="compose")
-        
-        if total_duration > target_duration:
-            final_clip = final_clip.subclip(0, target_duration)
-        
-        if audio_path:
+        if len(final_clips) > 0:
+            final_clip = concatenate_videoclips(final_clips, method="compose")
+            
+            if total_duration > target_duration:
+                final_clip = final_clip.subclip(0, target_duration)
+            
+            if audio_path:
+                try:
+                    audio_clip = AudioFileClip(audio_path).subclip(0, target_duration)
+                    final_clip = final_clip.set_audio(audio_clip)
+                    audio_clip.close()
+                except Exception as e:
+                    logging.error(f"Error setting audio: {str(e)}")
+
+            logging.info("Mengubah resolusi video...")
+            final_clip = final_clip.resize(newsize=(854, 480))  # Force 480p
+
+            output_path = os.path.join(os.path.dirname(movie_path), "movie_recap_output.mp4")
+            logging.info("Memulai proses rendering...")
+            
             try:
-                audio_clip = AudioFileClip(audio_path).subclip(0, target_duration)
-                final_clip = final_clip.set_audio(audio_clip)
-                audio_clip.close()
+                final_clip.write_videofile(
+                    output_path,
+                    codec="libx264",
+                    audio_codec="aac",
+                    threads=1,  # Force single thread
+                    fps=24,
+                    preset='ultrafast',  # Use fastest encoding preset
+                    logger=None,
+                    verbose=False  # Add this to prevent stdout issues
+                )
+                
+                logging.info(f"Selesai! Video recap berhasil disimpan di: {output_path}")
             except Exception as e:
-                logging.error(f"Error setting audio: {str(e)}")
-
-        logging.info("Mengubah resolusi video...")
-        final_clip = final_clip.resize(newsize=(854, 480))  # Force 480p
-
-        output_path = os.path.join(os.path.dirname(movie_path), "movie_recap_output.mp4")
-        logging.info("Memulai proses rendering...")
-        
-        final_clip.write_videofile(
-            output_path,
-            codec="libx264",
-            audio_codec="aac",
-            threads=1,  # Force single thread
-            fps=24,
-            preset='ultrafast',  # Use fastest encoding preset
-            logger=None
-        )
-        
-        logging.info(f"Selesai! Video recap berhasil disimpan di: {output_path}")
-        
+                logging.error(f"Error during video rendering: {str(e)}")
+                print("\nTerjadi kesalahan saat rendering video.")
+                print("Pastikan:")
+                print("1. File video input tidak rusak")
+                print("2. Ada cukup ruang disk")
+                print("3. Format timestamp valid")
+        else:
+            raise Exception("Tidak ada klip yang berhasil diproses.")
+            
     except Exception as e:
         logging.error(f"Terjadi kesalahan fatal: {str(e)}")
         print("\nTerjadi kesalahan dalam proses rendering.")
