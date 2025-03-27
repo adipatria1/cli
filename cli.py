@@ -196,13 +196,25 @@ def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="720p
         if 'final_clip' in locals():
             final_clip.close()
 
-def list_files_in_directory(directory, extension):
-    """Menampilkan daftar file dengan ekstensi tertentu dalam direktori"""
+def find_files_recursive(directory, extensions):
+    """Mencari file dengan ekstensi tertentu di direktori dan subdirektori"""
     files = []
-    for file in os.listdir(directory):
-        if file.lower().endswith(extension):
-            files.append(file)
-    return files
+    for root, _, filenames in os.walk(directory):
+        for filename in filenames:
+            if filename.lower().endswith(extensions):
+                full_path = os.path.join(root, filename)
+                rel_path = os.path.relpath(full_path, directory)
+                files.append((rel_path, full_path))
+    return sorted(files)
+
+def get_file_path(prompt, file_type):
+    while True:
+        path = input(prompt).strip()
+        if not path:
+            return None
+        if os.path.isfile(path):
+            return path
+        print(f"File tidak ditemukan: {path}")
 
 def main():
     print("\nAuto Movie Recap - Command Line Version")
@@ -212,68 +224,119 @@ def main():
     current_dir = os.getcwd()
     
     # Input file movie
-    print("\nDaftar file video yang tersedia:")
-    video_files = list_files_in_directory(current_dir, ('.mp4', '.mov', '.avi'))
-    if not video_files:
-        print("Tidak ada file video di direktori ini.")
-        sys.exit(1)
-    
-    for i, file in enumerate(video_files, 1):
-        print(f"{i}. {file}")
+    print("\nPilih metode input file video:")
+    print("1. Pilih dari daftar")
+    print("2. Masukkan path manual")
     
     while True:
-        try:
-            choice = int(input("\nPilih nomor file video (1-%d): " % len(video_files)))
-            if 1 <= choice <= len(video_files):
-                movie_path = os.path.join(current_dir, video_files[choice-1])
-                break
-            print("Pilihan tidak valid!")
-        except ValueError:
-            print("Masukkan nomor yang valid!")
+        choice = input("Pilihan (1/2): ").strip()
+        if choice in ['1', '2']:
+            break
+        print("Pilihan tidak valid!")
 
-    # Input file timestamp
-    print("\nDaftar file timestamp yang tersedia:")
-    timestamp_files = list_files_in_directory(current_dir, '.txt')
-    if not timestamp_files:
-        print("Tidak ada file timestamp di direktori ini.")
-        sys.exit(1)
-    
-    for i, file in enumerate(timestamp_files, 1):
-        print(f"{i}. {file}")
-    
-    while True:
-        try:
-            choice = int(input("\nPilih nomor file timestamp (1-%d): " % len(timestamp_files)))
-            if 1 <= choice <= len(timestamp_files):
-                timestamp_path = os.path.join(current_dir, timestamp_files[choice-1])
-                break
-            print("Pilihan tidak valid!")
-        except ValueError:
-            print("Masukkan nomor yang valid!")
-
-    # Input file audio (opsional)
-    print("\nDaftar file audio yang tersedia:")
-    audio_files = list_files_in_directory(current_dir, ('.mp3', '.wav'))
-    if audio_files:
-        for i, file in enumerate(audio_files, 1):
-            print(f"{i}. {file}")
-        print("0. Tidak menggunakan audio")
+    if choice == '1':
+        print("\nMencari file video...")
+        video_files = find_files_recursive(current_dir, ('.mp4', '.mov', '.avi'))
+        if not video_files:
+            print("Tidak ada file video di direktori ini dan subdirektorinya.")
+            sys.exit(1)
+        
+        print("\nDaftar file video yang tersedia:")
+        for i, (display_path, _) in enumerate(video_files, 1):
+            print(f"{i}. {display_path}")
         
         while True:
             try:
-                choice = int(input("\nPilih nomor file audio (0-%d): " % len(audio_files)))
-                if choice == 0:
-                    audio_path = None
-                    break
-                if 1 <= choice <= len(audio_files):
-                    audio_path = os.path.join(current_dir, audio_files[choice-1])
+                choice = int(input("\nPilih nomor file video (1-%d): " % len(video_files)))
+                if 1 <= choice <= len(video_files):
+                    _, movie_path = video_files[choice-1]
                     break
                 print("Pilihan tidak valid!")
             except ValueError:
                 print("Masukkan nomor yang valid!")
     else:
-        print("Tidak ada file audio di direktori ini.")
+        movie_path = get_file_path("\nMasukkan path file video: ", "video")
+        if not movie_path:
+            print("Path file video tidak valid.")
+            sys.exit(1)
+
+    # Input file timestamp
+    print("\nPilih metode input file timestamp:")
+    print("1. Pilih dari daftar")
+    print("2. Masukkan path manual")
+    
+    while True:
+        choice = input("Pilihan (1/2): ").strip()
+        if choice in ['1', '2']:
+            break
+        print("Pilihan tidak valid!")
+
+    if choice == '1':
+        print("\nMencari file timestamp...")
+        timestamp_files = find_files_recursive(current_dir, '.txt')
+        if not timestamp_files:
+            print("Tidak ada file timestamp di direktori ini dan subdirektorinya.")
+            sys.exit(1)
+        
+        print("\nDaftar file timestamp yang tersedia:")
+        for i, (display_path, _) in enumerate(timestamp_files, 1):
+            print(f"{i}. {display_path}")
+        
+        while True:
+            try:
+                choice = int(input("\nPilih nomor file timestamp (1-%d): " % len(timestamp_files)))
+                if 1 <= choice <= len(timestamp_files):
+                    _, timestamp_path = timestamp_files[choice-1]
+                    break
+                print("Pilihan tidak valid!")
+            except ValueError:
+                print("Masukkan nomor yang valid!")
+    else:
+        timestamp_path = get_file_path("\nMasukkan path file timestamp: ", "timestamp")
+        if not timestamp_path:
+            print("Path file timestamp tidak valid.")
+            sys.exit(1)
+
+    # Input file audio (opsional)
+    print("\nPilih metode input file audio (opsional):")
+    print("1. Pilih dari daftar")
+    print("2. Masukkan path manual")
+    print("3. Tidak menggunakan audio")
+    
+    while True:
+        choice = input("Pilihan (1/2/3): ").strip()
+        if choice in ['1', '2', '3']:
+            break
+        print("Pilihan tidak valid!")
+
+    if choice == '3':
         audio_path = None
+    elif choice == '1':
+        print("\nMencari file audio...")
+        audio_files = find_files_recursive(current_dir, ('.mp3', '.wav'))
+        if not audio_files:
+            print("Tidak ada file audio di direktori ini dan subdirektorinya.")
+            audio_path = None
+        else:
+            print("\nDaftar file audio yang tersedia:")
+            for i, (display_path, _) in enumerate(audio_files, 1):
+                print(f"{i}. {display_path}")
+            print("0. Tidak menggunakan audio")
+            
+            while True:
+                try:
+                    choice = int(input("\nPilih nomor file audio (0-%d): " % len(audio_files)))
+                    if choice == 0:
+                        audio_path = None
+                        break
+                    if 1 <= choice <= len(audio_files):
+                        _, audio_path = audio_files[choice-1]
+                        break
+                    print("Pilihan tidak valid!")
+                except ValueError:
+                    print("Masukkan nomor yang valid!")
+    else:
+        audio_path = get_file_path("\nMasukkan path file audio: ", "audio")
 
     # Pilih resolusi
     print("\nPilih resolusi output:")
