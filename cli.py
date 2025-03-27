@@ -8,6 +8,10 @@ from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips,
 from moviepy.video.fx.freeze import freeze
 from moviepy.video.fx.resize import resize
 import numpy as np
+from moviepy.config import change_settings
+
+# Configure MoviePy to use a specific temporary file location
+change_settings({"TEMP_DIR": "/tmp"})
 
 # Setup logging
 logging.basicConfig(
@@ -216,16 +220,19 @@ def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="480p
             try:
                 if effect_type == 'slow':
                     clip, new_time = apply_slow_motion_effect(video, current_time, timestamps)
-                    effect_counts['slow'] += 1
+                    if clip is not None:
+                        effect_counts['slow'] += 1
                 elif effect_type == 'freeze':
                     clip, new_time = apply_freeze_effect(video, current_time, timestamps)
-                    effect_counts['freeze'] += 1
+                    if clip is not None:
+                        effect_counts['freeze'] += 1
                 else:  # normal
                     clip, new_time = generate_normal_clip(video, current_time, timestamps)
-                    effect_counts['normal'] += 1
+                    if clip is not None:
+                        effect_counts['normal'] += 1
 
                 if clip is None or new_time is None:
-                    break
+                    continue
 
                 current_time = new_time
                 total_duration += clip.duration
@@ -274,38 +281,50 @@ def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="480p
 
         logging.info("Menggabungkan klip final...")
         if len(final_clips) > 0:
-            final_clip = concatenate_videoclips(final_clips, method="compose")
-            
-            if total_duration > target_duration:
-                final_clip = final_clip.subclip(0, target_duration)
-            
-            if audio_path:
-                try:
-                    audio_clip = AudioFileClip(audio_path).subclip(0, target_duration)
-                    final_clip = final_clip.set_audio(audio_clip)
-                    audio_clip.close()
-                except Exception as e:
-                    logging.error(f"Error setting audio: {str(e)}")
-
-            logging.info("Mengubah resolusi video...")
-            final_clip = final_clip.resize(newsize=(854, 480))  # Force 480p
-
-            output_path = os.path.join(os.path.dirname(movie_path), "movie_recap_output.mp4")
-            logging.info("Memulai proses rendering...")
-            
             try:
+                final_clip = concatenate_videoclips(final_clips, method="compose")
+                
+                if total_duration > target_duration:
+                    final_clip = final_clip.subclip(0, target_duration)
+                
+                if audio_path:
+                    try:
+                        audio_clip = AudioFileClip(audio_path).subclip(0, target_duration)
+                        final_clip = final_clip.set_audio(audio_clip)
+                        audio_clip.close()
+                    except Exception as e:
+                        logging.error(f"Error setting audio: {str(e)}")
+
+                logging.info("Mengubah resolusi video...")
+                final_clip = final_clip.resize(newsize=(854, 480))  # Force 480p
+
+                output_path = os.path.join(os.path.dirname(movie_path), "movie_recap_output.mp4")
+                logging.info("Memulai proses rendering...")
+                
+                # Create a temporary file for the video
+                temp_output = os.path.join("/tmp", "temp_output.mp4")
+                
                 final_clip.write_videofile(
-                    output_path,
+                    temp_output,
                     codec="libx264",
                     audio_codec="aac",
                     threads=1,  # Force single thread
                     fps=24,
                     preset='ultrafast',  # Use fastest encoding preset
                     logger=None,
-                    verbose=False  # Add this to prevent stdout issues
+                    verbose=False,  # Add this to prevent stdout issues
+                    ffmpeg_params=["-strict", "-2"]  # Add more flexible codec handling
                 )
                 
-                logging.info(f"Selesai! Video recap berhasil disimpan di: {output_path}")
+                # Move the temporary file to the final location
+                if os.path.exists(temp_output):
+                    if os.path.exists(output_path):
+                        os.remove(output_path)
+                    os.rename(temp_output, output_path)
+                    logging.info(f"Selesai! Video recap berhasil disimpan di: {output_path}")
+                else:
+                    raise Exception("Temporary output file not created")
+                    
             except Exception as e:
                 logging.error(f"Error during video rendering: {str(e)}")
                 print("\nTerjadi kesalahan saat rendering video.")
@@ -313,6 +332,7 @@ def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="480p
                 print("1. File video input tidak rusak")
                 print("2. Ada cukup ruang disk")
                 print("3. Format timestamp valid")
+                print("4. Folder output memiliki permission yang benar")
         else:
             raise Exception("Tidak ada klip yang berhasil diproses.")
             
@@ -337,6 +357,14 @@ def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="480p
                 except:
                     pass
             force_garbage_collection()
+            
+            # Clean up temporary files
+            temp_output = os.path.join("/tmp", "temp_output.mp4")
+            if os.path.exists(temp_output):
+                try:
+                    os.remove(temp_output)
+                except:
+                    pass
         except Exception as e:
             logging.error(f"Error saat membersihkan resources: {str(e)}")
 
