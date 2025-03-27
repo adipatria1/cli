@@ -1,8 +1,6 @@
 import os
 import random
 import sys
-import tkinter as tk
-from tkinter import filedialog
 from moviepy.editor import VideoFileClip, AudioFileClip, concatenate_videoclips, vfx, ImageClip, CompositeVideoClip
 from moviepy.video.fx.freeze import freeze
 from moviepy.video.fx.resize import resize
@@ -198,42 +196,83 @@ def generate_recap(movie_path, timestamp_path, audio_path=None, resolution="720p
         if 'final_clip' in locals():
             final_clip.close()
 
-def main():
-    # Inisialisasi root window untuk dialog file (akan disembunyikan)
-    root = tk.Tk()
-    root.withdraw()  # Sembunyikan window utama
+def list_files_in_directory(directory, extension):
+    """Menampilkan daftar file dengan ekstensi tertentu dalam direktori"""
+    files = []
+    for file in os.listdir(directory):
+        if file.lower().endswith(extension):
+            files.append(file)
+    return files
 
+def main():
     print("\nAuto Movie Recap - Command Line Version")
     print("======================================")
     
+    # Dapatkan direktori saat ini
+    current_dir = os.getcwd()
+    
     # Input file movie
-    print("\nPilih file movie...")
-    movie_path = filedialog.askopenfilename(
-        title="Pilih File Movie",
-        filetypes=[("Video Files", "*.mp4 *.mov *.avi")]
-    )
-    if not movie_path:
-        print("Tidak ada file yang dipilih. Program berhenti.")
-        sys.exit()
+    print("\nDaftar file video yang tersedia:")
+    video_files = list_files_in_directory(current_dir, ('.mp4', '.mov', '.avi'))
+    if not video_files:
+        print("Tidak ada file video di direktori ini.")
+        sys.exit(1)
+    
+    for i, file in enumerate(video_files, 1):
+        print(f"{i}. {file}")
+    
+    while True:
+        try:
+            choice = int(input("\nPilih nomor file video (1-%d): " % len(video_files)))
+            if 1 <= choice <= len(video_files):
+                movie_path = os.path.join(current_dir, video_files[choice-1])
+                break
+            print("Pilihan tidak valid!")
+        except ValueError:
+            print("Masukkan nomor yang valid!")
 
     # Input file timestamp
-    print("\nPilih file timestamp...")
-    timestamp_path = filedialog.askopenfilename(
-        title="Pilih File Timestamp",
-        filetypes=[("Text Files", "*.txt")]
-    )
-    if not timestamp_path:
-        print("Tidak ada file yang dipilih. Program berhenti.")
-        sys.exit()
+    print("\nDaftar file timestamp yang tersedia:")
+    timestamp_files = list_files_in_directory(current_dir, '.txt')
+    if not timestamp_files:
+        print("Tidak ada file timestamp di direktori ini.")
+        sys.exit(1)
+    
+    for i, file in enumerate(timestamp_files, 1):
+        print(f"{i}. {file}")
+    
+    while True:
+        try:
+            choice = int(input("\nPilih nomor file timestamp (1-%d): " % len(timestamp_files)))
+            if 1 <= choice <= len(timestamp_files):
+                timestamp_path = os.path.join(current_dir, timestamp_files[choice-1])
+                break
+            print("Pilihan tidak valid!")
+        except ValueError:
+            print("Masukkan nomor yang valid!")
 
     # Input file audio (opsional)
-    print("\nPilih file audio (opsional, klik Cancel untuk skip)...")
-    audio_path = filedialog.askopenfilename(
-        title="Pilih File Audio (Opsional)",
-        filetypes=[("Audio Files", "*.mp3 *.wav")]
-    )
-    if not audio_path:
-        print("Tidak ada file audio yang dipilih, melanjutkan tanpa audio.")
+    print("\nDaftar file audio yang tersedia:")
+    audio_files = list_files_in_directory(current_dir, ('.mp3', '.wav'))
+    if audio_files:
+        for i, file in enumerate(audio_files, 1):
+            print(f"{i}. {file}")
+        print("0. Tidak menggunakan audio")
+        
+        while True:
+            try:
+                choice = int(input("\nPilih nomor file audio (0-%d): " % len(audio_files)))
+                if choice == 0:
+                    audio_path = None
+                    break
+                if 1 <= choice <= len(audio_files):
+                    audio_path = os.path.join(current_dir, audio_files[choice-1])
+                    break
+                print("Pilihan tidak valid!")
+            except ValueError:
+                print("Masukkan nomor yang valid!")
+    else:
+        print("Tidak ada file audio di direktori ini.")
         audio_path = None
 
     # Pilih resolusi
